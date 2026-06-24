@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: add StockCode value object with market inference *)",
+      "Bash(python -m pytest backend/tests/unit/shared/test_StockCode.py -v)",
+      "Bash(python -m pytest tests/unit/shared/test_StockCode.py -v --no-header)",
+      "Bash(PYTHONPATH=\"D:/workspace/code/py/stock-selector/backend\" python -m pytest tests/unit/shared/test_StockCode.py -v)",
+      "Bash(python -m pytest tests/unit/shared/test_TimeRange.py -v)",
+      "Bash(python -m pytest tests/unit/shared/ -v)",
+      "Bash(git commit *)",
+      "Bash(python -m pytest backend/tests/unit/shared/test_TimeRange.py -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/unit/shared/test_TimeRange.py -v)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"from src.market.infrastructure.adapters.AKShareAdapter import AKShareAdapter; print\\('OK'\\)\")",
+      "Bash(python -m pytest tests/unit/market/test_DataSourceRouter.py -v)",
+      "Bash(python -c \"from src.market.application.QuoteQueryService import QuoteQueryService; print\\('OK'\\)\")",
+      "Bash(python -c \"from src.llm.domain.Prompt import BUILTIN_PROMPTS; print\\(len\\(BUILTIN_PROMPTS\\)\\)\")",
+      "Bash(python -c \"from src.llm.domain.ModelProvider import ProviderConfig, ProviderRegistry; r = ProviderRegistry\\(\\); print\\('OK:', r.default\\(\\)\\)\")",
+      "Bash(python -c \"from src.llm.domain.Scenario import ScenarioType, ScenarioConfig; print\\('OK:', ScenarioType.SCORING.value\\)\")",
+      "Bash(python -c \"from src.llm.domain.Analysis import ScoreCard, StockAnalysis, AnalysisRepository; print\\('OK: Analysis domain imported'\\)\")",
+      "Bash(python -c \"from src.llm.infrastructure.adapters.OpenAICompatAdapter import OpenAICompatAdapter; print\\('OK'\\)\")",
+      "Bash(python -c \"from src.llm.infrastructure.clients.LLMClient import LLMClient; from src.llm.infrastructure.adapters.OpenAICompatAdapter import OpenAICompatAdapter; print\\('Both imports OK'\\)\")",
+      "Bash(python -c \"from src.screening.domain.Dimension import DEFAULT_DIMENSIONS; print\\(len\\(DEFAULT_DIMENSIONS\\)\\)\")",
+      "Bash(python -c \"from src.screening.domain.ScreenResult import ScreenResult; print\\('ScreenResult imported OK'\\)\")",
+      "Bash(python -c \"from src.screening.application.ScreenStockUseCase import ScreenStockUseCase; print\\('OK'\\)\")",
+      "Bash(git -C D:\\\\workspace\\\\code\\\\py\\\\stock-selector status)",
+      "Bash(git -C D:\\\\workspace\\\\code\\\\py\\\\stock-selector branch)",
+      "Bash(python -c \"from src.bootstrap import load_config; c = load_config\\('config'\\); print\\(c['market']['data_sources'][0]['id']\\)\")",
+      "Bash(python -c \"from src.cli.main import app; print\\('CLI OK'\\)\")",
+      "Bash(stock-selector --help)",
+      "Bash(python -c \"from src.cli.main import run; print\\('import OK'\\)\")",
+      "Bash(pip show *)",
+      "Bash(stock-selector market *)",
+      "Bash(stock-selector screening *)",
+      "Bash(python -m pytest tests/integration/test_cli_smoke.py -v)"
+    ]
+  }
+}

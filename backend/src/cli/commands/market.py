@@ -1,7 +1,6 @@
 # src/cli/commands/market.py
 import typer
 import asyncio
-from src.cli.main import get_app_context
 
 market_app = typer.Typer(help="市场数据查询")
 
@@ -11,6 +10,7 @@ def quote(
     code: str = typer.Argument(..., help="股票代码，如 600001.SH"),
 ):
     """查询实时行情"""
+    from src.cli.main import get_app_context
     ctx = get_app_context()
 
     async def _run():

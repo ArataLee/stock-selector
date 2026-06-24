@@ -1,7 +1,6 @@
 # src/cli/commands/screening.py
 import asyncio
 import typer
-from src.cli.main import get_app_context
 from src.screening.domain.Dimension import DEFAULT_DIMENSIONS
 
 screening_app = typer.Typer(help="选股筛选")
@@ -16,6 +15,7 @@ def screen(
     ),
 ):
     """对指定股票进行成长价值评分"""
+    from src.cli.main import get_app_context
     ctx = get_app_context()
 
     if ctx.provider_registry is None or ctx.provider_registry.default() is None:
@@ -64,6 +64,7 @@ def analyze(
     code: str = typer.Argument(..., help="股票代码，如 600001.SH"),
 ):
     """深度分析单只股票"""
+    from src.cli.main import get_app_context
     ctx = get_app_context()
 
     if ctx.provider_registry is None or ctx.provider_registry.default() is None:

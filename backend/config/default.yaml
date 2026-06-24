@@ -1,0 +1,37 @@
+market:
+  data_sources:
+    - id: akshare
+      name: AKShare
+      type: free
+      priority: 2
+      enabled: true
+    - id: baostock
+      name: Baostock
+      type: free
+      priority: 3
+      enabled: true
+    - id: tushare
+      name: Tushare
+      type: account
+      priority: 1
+      enabled: false
+
+llm:
+  providers: []
+  scenario_routing:
+    conversation: ${provider}
+    scoring: ${provider}
+    report: ${provider}
+
+screening:
+  default_dimensions: ["financial", "industry", "valuation"]
+  composite_strategy: weighted
+  universe_default: all
+  batch_size: 20
+
+notification:
+  channels: []
+
+scheduler:
+  max_concurrent_monitors: 5
+  default_cron: "0 18 * * 1-5"

@@ -1,0 +1,19 @@
+market:
+  accounts:
+    tushare:
+      token: "your_tushare_token"
+
+llm:
+  providers:
+    - id: deepseek
+      api_base: https://api.deepseek.com/v1
+      api_key: sk-your-key
+      model: deepseek-chat
+      default: true
+
+notification:
+  channels:
+    - id: wecom_1
+      type: wecom
+      webhook_url: https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx
+      enabled: true

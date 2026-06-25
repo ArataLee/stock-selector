@@ -18,6 +18,38 @@ const Dashboard: React.FC = () => {
 
   const enabledSources = sources.filter(s => s.enabled);
 
+  const getMarketStatus = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const t = h * 60 + m;
+
+    // 周六日休市
+    if (day === 0 || day === 6) {
+      return { text: '休市', color: '#8c8c8c' };
+    }
+    // 上午盘 9:30-11:30
+    if (t >= 9 * 60 + 30 && t < 11 * 60 + 30) {
+      return { text: '交易中', color: '#52c41a' };
+    }
+    // 午间休市 11:30-13:00
+    if (t >= 11 * 60 + 30 && t < 13 * 60) {
+      return { text: '午间休市', color: '#faad14' };
+    }
+    // 下午盘 13:00-15:00
+    if (t >= 13 * 60 && t < 15 * 60) {
+      return { text: '交易中', color: '#52c41a' };
+    }
+    // 盘前或盘后
+    if (t < 9 * 60 + 30) {
+      return { text: '盘前', color: '#faad14' };
+    }
+    return { text: '已闭市', color: '#8c8c8c' };
+  };
+
+  const marketStatus = getMarketStatus();
+
   return (
     <div>
       <Typography.Title level={3}>仪表盘</Typography.Title>
@@ -29,7 +61,7 @@ const Dashboard: React.FC = () => {
           <Card><Statistic title="关注股票" value={watchCount} /></Card>
         </Col>
         <Col span={6}>
-          <Card><Statistic title="市场状态" value="交易中" valueStyle={{ color: '#52c41a' }} /></Card>
+          <Card><Statistic title="市场状态" value={marketStatus.text} valueStyle={{ color: marketStatus.color }} /></Card>
         </Col>
         <Col span={6}>
           <Card><Statistic title="今日筛选" value="0" /></Card>

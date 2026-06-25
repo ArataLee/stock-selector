@@ -31,6 +31,18 @@ class StockCode:
         return self._market
 
     @staticmethod
+    def parse(raw: str) -> StockCode:
+        """Smart parse: '600001.SH' or '600001' or 'sh600001'."""
+        s = raw.strip().upper()
+        # Check if it's a 6-digit pure number
+        if s.isdigit() and len(s) == 6:
+            return StockCode.from_digits(s)
+        # Check if it matches CODE.SUFFIX format
+        if _CODE_PATTERN.match(s):
+            return StockCode(s)
+        raise ValueError(f"Cannot parse stock code: {raw}. Expected: 600001 or 600001.SH")
+
+    @staticmethod
     def from_digits(digits: str) -> StockCode:
         if len(digits) != 6 or not digits.isdigit():
             raise ValueError("Stock code digits must be 6 characters")

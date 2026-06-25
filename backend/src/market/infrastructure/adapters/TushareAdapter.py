@@ -54,7 +54,7 @@ class TushareAdapter(StockRepository, QuoteRepository, FinancialRepository):
         except Exception:
             return None
 
-    async def fetch_batch(self, codes: list[StockCode]) -> list[Quote]:
+    async def fetch_quotes(self, codes: list[StockCode]) -> list[Quote]:
         try:
             pro = self._get_pro()
             ts_codes = ",".join(str(c) for c in codes)
@@ -78,7 +78,36 @@ class TushareAdapter(StockRepository, QuoteRepository, FinancialRepository):
             return []
 
     async def fetch(self, code: StockCode, periods: int = 4) -> list[FinancialReport]:
-        return []
+        try:
+            pro = self._get_pro()
+            df = pro.fina_indicator(
+                ts_code=str(code),
+                fields="ts_code,end_date,or_yoy,profit_dedt_yoy,roe,grossprofit_margin,netprofit_margin",
+                period=str(periods * 250),  # 近似：每年~250个交易日对应的数据跨度
+            )
+            if df is None or df.empty:
+                return []
+            reports: list[FinancialReport] = []
+            for _, r in df.head(periods).iterrows():
+                end_date = str(r["end_date"]) if r.get("end_date") else ""
+                period_str = f"{end_date[:4]}Q{(int(end_date[4:6]) - 1) // 3 + 1}" if len(end_date) >= 6 else end_date
+                reports.append(FinancialReport(
+                    code=code,
+                    period=period_str,
+                    revenue_yoy=float(r["or_yoy"]) if r.get("or_yoy") else None,
+                    profit_yoy=float(r["profit_dedt_yoy"]) if r.get("profit_dedt_yoy") else None,
+                    roe=float(r["roe"]) if r.get("roe") else None,
+                    gross_margin=float(r["grossprofit_margin"]) if r.get("grossprofit_margin") else None,
+                    net_margin=float(r["netprofit_margin"]) if r.get("netprofit_margin") else None,
+                ))
+            return reports
+        except Exception:
+            return []
 
-    async def fetch_batch(self, codes: list[StockCode], periods: int = 4) -> dict[StockCode, list[FinancialReport]]:
-        return {}
+    async def fetch_financials(self, codes: list[StockCode], periods: int = 4) -> dict[StockCode, list[FinancialReport]]:
+        result: dict[StockCode, list[FinancialReport]] = {}
+        for code in codes:
+            reports = await self.fetch(code, periods)
+            if reports:
+                result[code] = reports
+        return result

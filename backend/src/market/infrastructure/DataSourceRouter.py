@@ -34,9 +34,9 @@ class QuoteRouter(QuoteRepository):
                 return result
         return None
 
-    async def fetch_batch(self, codes: list[StockCode]) -> list[Quote]:
+    async def fetch_quotes(self, codes: list[StockCode]) -> list[Quote]:
         for adapter in self._adapters:
-            result = await adapter.fetch_batch(codes)
+            result = await adapter.fetch_quotes(codes)
             if result:
                 return result
         return []
@@ -53,9 +53,9 @@ class FinancialRouter(FinancialRepository):
                 return result
         return []
 
-    async def fetch_batch(self, codes: list[StockCode], periods: int = 4) -> dict[StockCode, list[FinancialReport]]:
+    async def fetch_financials(self, codes: list[StockCode], periods: int = 4) -> dict[StockCode, list[FinancialReport]]:
         for adapter in self._adapters:
-            result = await adapter.fetch_batch(codes, periods)
+            result = await adapter.fetch_financials(codes, periods)
             if result:
                 return result
         return {}

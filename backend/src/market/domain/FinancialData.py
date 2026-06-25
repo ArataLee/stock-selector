@@ -22,5 +22,5 @@ class FinancialRepository(ABC):
         ...
 
     @abstractmethod
-    async def fetch_batch(self, codes: list[StockCode], periods: int = 4) -> dict[StockCode, list[FinancialReport]]:
+    async def fetch_financials(self, codes: list[StockCode], periods: int = 4) -> dict[StockCode, list[FinancialReport]]:
         ...

@@ -23,5 +23,5 @@ class QuoteRepository(ABC):
         ...
 
     @abstractmethod
-    async def fetch_batch(self, codes: list[StockCode]) -> list[Quote]:
+    async def fetch_quotes(self, codes: list[StockCode]) -> list[Quote]:
         ...

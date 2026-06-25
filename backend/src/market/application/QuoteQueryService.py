@@ -13,4 +13,4 @@ class QuoteQueryService:
 
     async def get_quotes(self, code_strs: list[str]) -> list[Quote]:
         codes = [StockCode(s) for s in code_strs]
-        return await self._repo.fetch_batch(codes)
+        return await self._repo.fetch_quotes(codes)

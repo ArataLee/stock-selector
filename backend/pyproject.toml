@@ -9,6 +9,11 @@ dependencies = [
     "pydantic>=2.10",
     "pyyaml>=6.0",
     "akshare>=1.17",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "duckdb>=1.1",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
 ]
 
 [project.scripts]

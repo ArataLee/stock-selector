@@ -10,6 +10,7 @@ from src.llm.domain.ModelProvider import ProviderRegistry, ProviderConfig
 from src.llm.infrastructure.adapters.OpenAICompatAdapter import OpenAICompatAdapter
 from src.market.application.QuoteQueryService import QuoteQueryService
 from src.screening.application.ScreenStockUseCase import ScreenStockUseCase
+from src.screening.application.DiscoveryService import DiscoveryService
 
 
 class AppContext:
@@ -22,6 +23,7 @@ class AppContext:
         self.llm_adapter: OpenAICompatAdapter | None = None
         self.quote_service: QuoteQueryService | None = None
         self.screen_usecase: ScreenStockUseCase | None = None
+        self.discovery_service: DiscoveryService | None = None
 
 
 def load_config(config_dir: str) -> dict:
@@ -101,6 +103,13 @@ def bootstrap(config_dir: str | None = None) -> AppContext:
         quote_repo=ctx.quote_router,
         financial_repo=ctx.financial_router,
         llm_adapter=ctx.llm_adapter,
+    )
+
+    ctx.discovery_service = DiscoveryService(
+        quote_repo=ctx.quote_router,
+        financial_repo=ctx.financial_router,
+        llm_adapter=ctx.llm_adapter,
+        screen_usecase=ctx.screen_usecase,
     )
 
     return ctx

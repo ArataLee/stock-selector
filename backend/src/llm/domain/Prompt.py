@@ -37,13 +37,16 @@ DEFAULT_SCORING_PROMPT = PromptTemplate(
 - 60-80分：有一定成长价值，推荐
 - 80-100分：成长价值突出，力荐
 
+## 重要提示
+reasoning字段末尾必须加上"建议仅供参考，不构成任何投资建议。"
+
 ## 输出格式（严格JSON）
 ```json
-{
-  "dimension_scores": {"维度名": 分数, ...},
+{{
+  "dimension_scores": {{"维度名": 分数, ...}},
   "composite_score": 综合分数,
   "reasoning": "推荐理由，200字以内"
-}
+}}
 ```
 
 请直接输出JSON，不要包含其他内容。""",

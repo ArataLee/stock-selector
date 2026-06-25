@@ -66,7 +66,10 @@ class OpenAICompatAdapter:
 1. 先总体概述筛选结果
 2. 分析评分最高的3-5只股票
 3. 给出风险提示（面向投资新手）
-4. 使用Markdown格式，500字以内"""
+4. 使用Markdown格式，500字以内
+
+## 重要提示
+报告末尾必须加上"建议仅供参考，不构成任何投资建议。"""
 
         messages = [{"role": "user", "content": prompt}]
         return await client.chat(messages, temperature=0.5, max_tokens=2000)

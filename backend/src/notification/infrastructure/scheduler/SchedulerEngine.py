@@ -57,15 +57,15 @@ class SchedulerEngine:
         try:
             codes = await self._get_universe_codes(task.universe_type)
             dims = [d for d in DEFAULT_DIMENSIONS if d.id in task.dimensions] if task.dimensions else DEFAULT_DIMENSIONS
-            results = await self._screen_usecase.screen_batch(codes, dims)
+            outcome = await self._screen_usecase.screen_batch(codes, dims)
 
-            if not results:
+            if not outcome.results:
                 return
 
             stocks_data = [
                 {"code": str(r.stock_code), "name": r.stock_name,
                  "score": r.composite_score, "tier": r.tier.label, "reasoning": r.reasoning}
-                for r in results[:10]
+                for r in outcome.results[:10]
             ]
             report = await self._llm_adapter.generate_report(stocks_data)
 

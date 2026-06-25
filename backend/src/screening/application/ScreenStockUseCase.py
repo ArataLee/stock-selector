@@ -1,11 +1,25 @@
+import logging
+from dataclasses import dataclass, field
 from src.shared.domain.StockCode import StockCode
 from src.market.domain.MarketData import QuoteRepository
 from src.market.domain.FinancialData import FinancialRepository
 from src.llm.domain.Prompt import BUILTIN_PROMPTS
-from src.llm.domain.Analysis import ScoreCard
 from src.llm.infrastructure.adapters.OpenAICompatAdapter import OpenAICompatAdapter
 from src.screening.domain.Dimension import Dimension, DEFAULT_DIMENSIONS
 from src.screening.domain.ScreenResult import ScreenResult
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ScreeningOutcome:
+    results: list[ScreenResult] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)  # codes with no data
+
+    @property
+    def count(self) -> int:
+        return len(self.results)
 
 
 class ScreenStockUseCase:
@@ -19,19 +33,29 @@ class ScreenStockUseCase:
         self._financial_repo = financial_repo
         self._llm = llm_adapter
 
+    def _ensure_llm(self) -> None:
+        try:
+            self._llm._get_client()
+        except RuntimeError as e:
+            raise RuntimeError(
+                "未配置LLM Provider。请在设置中配置DeepSeek、通义千问等大语言模型。"
+            ) from e
+
+    @staticmethod
+    def _parse_code(raw: str) -> StockCode:
+        """Parse stock code with smart format detection."""
+        return StockCode.parse(raw)
+
     async def screen_single(self, code_str: str, dimensions: list[Dimension] | None = None) -> ScreenResult | None:
-        code = StockCode(code_str)
+        code = self._parse_code(code_str)
         dims = dimensions or DEFAULT_DIMENSIONS
 
-        # 1. 获取行情
         quote = await self._quote_repo.fetch_one(code)
         if quote is None:
+            logger.warning("No quote data for %s", code)
             return None
 
-        # 2. 获取财务数据
         reports = await self._financial_repo.fetch(code, periods=4)
-
-        # 3. 构建Prompt变量
         fin_text = self._format_financials(reports)
         dims_text = "\n".join(f"- {d.name}: {d.description}" for d in dims)
 
@@ -46,7 +70,6 @@ class ScreenStockUseCase:
             "dimensions": dims_text,
         }
 
-        # 4. LLM打分
         template = BUILTIN_PROMPTS["default_scoring"]
         score_card = await self._llm.score_stock(template, variables)
 
@@ -56,25 +79,44 @@ class ScreenStockUseCase:
             score_card=score_card,
         )
 
-    async def screen_batch(self, code_strs: list[str], dimensions: list[Dimension] | None = None) -> list[ScreenResult]:
-        codes = [StockCode(s) for s in code_strs]
+    async def screen_batch(
+        self, code_strs: list[str], dimensions: list[Dimension] | None = None
+    ) -> ScreeningOutcome:
+        # Validate LLM availability upfront
+        self._ensure_llm()
+
+        # Parse codes with smart detection
+        codes: list[StockCode] = []
+        parse_errors: list[str] = []
+        for s in code_strs:
+            try:
+                codes.append(self._parse_code(s))
+            except ValueError as e:
+                parse_errors.append(str(e))
+
+        if not codes:
+            return ScreeningOutcome(errors=parse_errors)
+
         dims = dimensions or DEFAULT_DIMENSIONS
 
-        # 1. 批量获取行情
-        quotes = await self._quote_repo.fetch_batch(codes)
+        # Fetch quotes
+        quotes = await self._quote_repo.fetch_quotes(codes)
         quote_map = {q.code: q for q in quotes}
 
-        # 2. 批量获取财务数据
-        fin_map = await self._financial_repo.fetch_batch(codes, periods=4)
+        # Fetch financials
+        fin_map = await self._financial_repo.fetch_financials(codes, periods=4)
 
-        # 3. 逐个LLM打分
+        # Score each stock
         template = BUILTIN_PROMPTS["default_scoring"]
         dims_text = "\n".join(f"- {d.name}: {d.description}" for d in dims)
 
         results: list[ScreenResult] = []
+        skipped: list[str] = []
+
         for code in codes:
             quote = quote_map.get(code)
             if quote is None:
+                skipped.append(f"{code} — 无行情数据")
                 continue
 
             reports = fin_map.get(code, [])
@@ -98,12 +140,16 @@ class ScreenStockUseCase:
                     stock_name=quote.name,
                     score_card=score_card,
                 ))
-            except Exception:
-                continue
+            except Exception as e:
+                skipped.append(f"{code} — LLM评分失败: {e}")
 
-        # 4. 按综合评分降序
         results.sort(key=lambda r: r.composite_score, reverse=True)
-        return results
+
+        return ScreeningOutcome(
+            results=results,
+            errors=parse_errors,
+            skipped=skipped,
+        )
 
     @staticmethod
     def _format_financials(reports) -> str:

@@ -6,49 +6,30 @@ import { configApi } from '../api/config';
 import { userApi } from '../api/user';
 import type { DataSourceItem } from '../types';
 
+const marketStatusColors: Record<string, string> = {
+  '交易中': '#52c41a',
+  '盘前': '#faad14',
+  '午间休市': '#faad14',
+  '已闭市': '#8c8c8c',
+  '休市': '#8c8c8c',
+};
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [sources, setSources] = useState<DataSourceItem[]>([]);
   const [watchCount, setWatchCount] = useState(0);
+  const [marketStatus, setMarketStatus] = useState('加载中');
 
   useEffect(() => {
     configApi.getDataSources().then(d => setSources(d.sources)).catch(() => {});
     userApi.getWatchlist().then(d => setWatchCount(d.items?.length || 0)).catch(() => {});
+    fetch('/api/market/status')
+      .then(r => r.json())
+      .then(d => setMarketStatus(d.status))
+      .catch(() => setMarketStatus('未知'));
   }, []);
 
   const enabledSources = sources.filter(s => s.enabled);
-
-  const getMarketStatus = () => {
-    const now = new Date();
-    const day = now.getDay();
-    const h = now.getHours();
-    const m = now.getMinutes();
-    const t = h * 60 + m;
-
-    // 周六日休市
-    if (day === 0 || day === 6) {
-      return { text: '休市', color: '#8c8c8c' };
-    }
-    // 上午盘 9:30-11:30
-    if (t >= 9 * 60 + 30 && t < 11 * 60 + 30) {
-      return { text: '交易中', color: '#52c41a' };
-    }
-    // 午间休市 11:30-13:00
-    if (t >= 11 * 60 + 30 && t < 13 * 60) {
-      return { text: '午间休市', color: '#faad14' };
-    }
-    // 下午盘 13:00-15:00
-    if (t >= 13 * 60 && t < 15 * 60) {
-      return { text: '交易中', color: '#52c41a' };
-    }
-    // 盘前或盘后
-    if (t < 9 * 60 + 30) {
-      return { text: '盘前', color: '#faad14' };
-    }
-    return { text: '已闭市', color: '#8c8c8c' };
-  };
-
-  const marketStatus = getMarketStatus();
 
   return (
     <div>
@@ -61,7 +42,7 @@ const Dashboard: React.FC = () => {
           <Card><Statistic title="关注股票" value={watchCount} /></Card>
         </Col>
         <Col span={6}>
-          <Card><Statistic title="市场状态" value={marketStatus.text} valueStyle={{ color: marketStatus.color }} /></Card>
+          <Card><Statistic title="市场状态" value={marketStatus} valueStyle={{ color: marketStatusColors[marketStatus] || '#8c8c8c' }} /></Card>
         </Col>
         <Col span={6}>
           <Card><Statistic title="今日筛选" value="0" /></Card>

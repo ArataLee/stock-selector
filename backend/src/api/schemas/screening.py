@@ -16,6 +16,8 @@ class ScreeningResponse(BaseModel):
     task_id: int
     results: list[ScreenResultResponse]
     count: int
+    skipped: list[str] = []
+    errors: list[str] = []
 
 class PreScreenRequest(BaseModel):
     universe: str = "all"

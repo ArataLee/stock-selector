@@ -39,12 +39,14 @@ async def create_screening(req: ScreeningRequest):
         task_id=0,
         results=resp_results,
         count=outcome.count,
+        skipped=outcome.skipped,
+        errors=outcome.errors,
     )
 
 
 @router.get("/tasks/{task_id}/results", response_model=ScreeningResponse)
 async def get_task_results(task_id: int):
-    return ScreeningResponse(task_id=task_id, results=[], count=0)
+    return ScreeningResponse(task_id=task_id, results=[], count=0, skipped=[], errors=[])
 
 
 @router.post("/discover", response_model=ScreeningResponse)
@@ -75,7 +77,10 @@ async def discover_stocks(req: DiscoverRequest):
     if outcome.errors:
         raise HTTPException(status_code=400, detail="; ".join(outcome.errors))
 
-    return ScreeningResponse(task_id=0, results=resp_results, count=outcome.count)
+    return ScreeningResponse(
+        task_id=0, results=resp_results, count=outcome.count,
+        skipped=outcome.skipped, errors=outcome.errors,
+    )
 
 
 @router.post("/pre-screen")

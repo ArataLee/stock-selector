@@ -31,6 +31,8 @@ const Screening: React.FC = () => {
   const [codes, setCodes] = useState('');
   const [dimensions, setDimensions] = useState<string[]>(['financial', 'industry', 'valuation']);
   const [results, setResults] = useState<ScreenResultResponse[]>([]);
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('discover');
   const [discoverQuery, setDiscoverQuery] = useState('');
@@ -46,8 +48,14 @@ const Screening: React.FC = () => {
     try {
       const resp = await screeningApi.create(codeList, dimensions);
       setResults(resp.results);
+      setSkipped(resp.skipped || []);
+      setErrors(resp.errors || []);
       incTodayCount(resp.count);
-      message.success(`筛选完成，共 ${resp.count} 只股票`);
+      if (resp.count === 0 && (resp.skipped || []).length > 0) {
+        message.warning('未获评分结果，查看下方跳过原因');
+      } else {
+        message.success(`筛选完成，共 ${resp.count} 只股票`);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '未知错误';
       message.error(`筛选失败: ${msg}`);
@@ -72,8 +80,14 @@ const Screening: React.FC = () => {
         return r.json();
       });
       setResults(resp.results || []);
+      setSkipped(resp.skipped || []);
+      setErrors(resp.errors || []);
       incTodayCount(resp.count || 0);
-      message.success(`发现 ${resp.count} 只推荐股票`);
+      if ((resp.count || 0) === 0) {
+        message.warning('未找到相关股票，尝试更具体的描述');
+      } else {
+        message.success(`发现 ${resp.count} 只推荐股票`);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '未知错误';
       message.error(`发现失败: ${msg}`);
@@ -161,6 +175,20 @@ const Screening: React.FC = () => {
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} style={{ marginBottom: 24 }} />
 
       {loading && <Spin tip="正在分析中，请稍候..."><div style={{ height: 100 }} /></Spin>}
+
+      {errors.length > 0 && (
+        <div style={{ marginBottom: 16, padding: 12, background: '#fff2f0', borderRadius: 8, border: '1px solid #ffccc7' }}>
+          <Typography.Text type="danger" strong>错误：</Typography.Text>
+          {errors.map((e, i) => <div key={i} style={{ color: '#ff4d4f' }}>{e}</div>)}
+        </div>
+      )}
+
+      {skipped.length > 0 && (
+        <div style={{ marginBottom: 16, padding: 12, background: '#fffbe6', borderRadius: 8, border: '1px solid #ffe58f' }}>
+          <Typography.Text type="warning" strong>跳过：</Typography.Text>
+          {skipped.map((s, i) => <div key={i} style={{ color: '#ad8b00' }}>{s}</div>)}
+        </div>
+      )}
 
       {results.length > 0 && (
         <Table dataSource={results} columns={columns} rowKey="stock_code" pagination={false} bordered />

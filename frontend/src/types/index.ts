@@ -30,6 +30,8 @@ export interface ScreeningResponse {
   task_id: number;
   results: ScreenResultResponse[];
   count: number;
+  skipped: string[];
+  errors: string[];
 }
 
 export interface DataSourceItem {

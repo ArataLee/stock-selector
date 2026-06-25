@@ -40,6 +40,11 @@ from src.cli.commands.screening import screening_app  # noqa: E402
 app.add_typer(screening_app, name="screening")
 
 
+from src.cli.commands.server import server_app  # noqa: E402
+
+app.add_typer(server_app, name="server")
+
+
 def run():
     app()
 

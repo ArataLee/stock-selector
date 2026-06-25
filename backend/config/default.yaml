@@ -1,37 +1,42 @@
-market:
-  data_sources:
-    - id: akshare
-      name: AKShare
-      type: free
-      priority: 2
-      enabled: true
-    - id: baostock
-      name: Baostock
-      type: free
-      priority: 3
-      enabled: true
-    - id: tushare
-      name: Tushare
-      type: account
-      priority: 1
-      enabled: false
-
 llm:
-  providers: []
+  providers:
+  - api_base: https://api.deepseek.com
+    api_key: sk-ce68d1e93366493183b3b8c94d3fb1a9
+    default: false
+    id: deepseek
+    max_tokens: 4096
+    model: deepseek-v4-pro
   scenario_routing:
     conversation: ${provider}
-    scoring: ${provider}
     report: ${provider}
-
-screening:
-  default_dimensions: ["financial", "industry", "valuation"]
-  composite_strategy: weighted
-  universe_default: all
-  batch_size: 20
-
+    scoring: ${provider}
+market:
+  data_sources:
+  - enabled: true
+    id: akshare
+    name: AKShare
+    priority: 2
+    type: free
+  - enabled: true
+    id: baostock
+    name: Baostock
+    priority: 3
+    type: free
+  - enabled: false
+    id: tushare
+    name: Tushare
+    priority: 1
+    type: account
 notification:
   channels: []
-
 scheduler:
+  default_cron: 0 18 * * 1-5
   max_concurrent_monitors: 5
-  default_cron: "0 18 * * 1-5"
+screening:
+  batch_size: 20
+  composite_strategy: weighted
+  default_dimensions:
+  - financial
+  - industry
+  - valuation
+  universe_default: all

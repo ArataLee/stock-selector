@@ -32,17 +32,24 @@ def screen(
             raise typer.Exit(1)
 
     async def _run():
-        results = await ctx.screen_usecase.screen_batch(codes, dims)
+        outcome = await ctx.screen_usecase.screen_batch(codes, dims)
 
-        if not results:
+        for err in outcome.errors:
+            typer.echo(f"⚠ {err}", err=True)
+        for skip in outcome.skipped:
+            typer.echo(f"⊘ {skip}", err=True)
+
+        if not outcome.results:
             typer.echo("未能获取任何评分结果。")
+            if outcome.skipped:
+                typer.echo("提示：请确保已配置LLM Provider，且股票代码正确。", err=True)
             return
 
         typer.echo(f"\n{'='*60}")
-        typer.echo(f"  成长价值评估结果（共{len(results)}只）")
+        typer.echo(f"  成长价值评估结果（共{outcome.count}只）")
         typer.echo(f"{'='*60}\n")
 
-        for i, r in enumerate(results, 1):
+        for i, r in enumerate(outcome.results, 1):
             tier_icon = {"不推荐": "🔴", "推荐": "🟡", "力荐": "🟢"}.get(r.tier.label, "")
             typer.echo(f"{i}. {tier_icon} {r.stock_name} ({r.stock_code})")
             typer.echo(f"   综合评分: {r.composite_score:.0f}  [{r.tier.label}]")

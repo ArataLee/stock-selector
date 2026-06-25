@@ -1,6 +1,7 @@
 # Stock Selector — 设计文档
 
 > A股市场（沪深京）成长价值选股助手，面向投资新手
+> 最后更新：2026-06-25
 
 ---
 
@@ -9,14 +10,15 @@
 面向A股（沪深京）市场，基于大语言模型帮助投资新手挑选有成长价值的股票。
 
 **核心功能：**
-- 多数据源自适应降级的统一数据接口
+- 多数据源自适应降级的统一数据接口（新浪→东财，同花顺→新浪）
 - LLM驱动的多维度综合评分（财务/行业赛道/估值等）
+- **智能发现**：自然语言描述行业/赛道 → 自动筛选候选股票 → LLM评分排序
 - 对话式选股交互 + 批量打分 + 分析报告生成
-- CLI + Web双界面
-- 定时市场扫描 + IM推送（企微/飞书/钉钉等）
+- CLI + Web双界面（React + Ant Design）
+- 定时市场扫描 + IM推送（企微/飞书/钉钉）
 - 用户自定义评估维度 + 关注列表管理
 
-**用户画像：** 投资新手，不擅长在市场上挑选具有成长性的股票
+**用户画像：** 投资新手，不知道如何选择投资标的，希望通过自然语言描述需求来发现股票
 
 ---
 
@@ -74,17 +76,31 @@
 ```
 shared/
 ├── domain/
-│   ├── StockCode.py       # 股票代码值对象（600001.SH → 沪市/600001）
-│   ├── Market.py           # 市场枚举（沪/深/京）
-│   ├── TimeRange.py        # 时间区间值对象
-│   ├── PageRequest.py      # 分页值对象
-│   └── ScoreTier.py        # 评分档位枚举
+│   ├── StockCode.py       # 股票代码值对象 + 智能解析
+│   │                       #   StockCode("600001.SH") — 标准格式
+│   │                       #   StockCode.from_digits("600001") — 6位数字 → 自动推断市场
+│   │                       #   StockCode.parse("600001") — 智能识别（6位纯数字 or x.SH格式）
+│   ├── Market.py           # 市场枚举（沪SH/深SZ/京BJ）
+│   ├── TimeRange.py        # 时间区间值对象 + years_back工厂方法
+│   └── ScoreTier.py        # 评分档位：不推荐(0-60)/推荐(60-80)/力荐(80-100)
 ├── events/
 │   ├── DomainEvent.py      # 领域事件基类
 │   └── EventPublisher.py   # 发布接口
 └── exceptions/
     └── DomainError.py      # 领域异常基类
 ```
+
+**StockCode.parse() 智能解析规则：**
+
+| 输入 | 输出 | 规则 |
+|------|------|------|
+| `600001` | `600001.SH` | 6开头→沪市 |
+| `000001` | `000001.SZ` | 0/2/3开头→深市 |
+| `300750` | `300750.SZ` | 创业板 |
+| `688001` | `688001.SH` | 科创板 |
+| `830001` | `830001.BJ` | 8/4开头→北交所 |
+| `600001.SH` | `600001.SH` | 标准格式直通 |
+| `600001.sh` | `600001.SH` | 大小写不敏感 |
 
 **判断标准：** 一个类被多个Context使用，且变更需协调各Context → 放Shared Kernel。
 
@@ -105,15 +121,25 @@ shared/
 ### 数据源策略
 
 - **免费数据源**（AKShare、Baostock等）：开箱即用
-- **账号数据源**（Tushare等）：用户配置账号后自动启用，删除配置后自动禁用
-- **降级链：** 按 priority 顺序尝试，失败自动降级到下一数据源
+- **账号数据源**（Tushare等）：用户配置账号后自动启用
+- **降级链：** 按 priority 顺序尝试，失败自动降级
+- **AKShare内部多源降级**（同一库内不同底层源）：
+
+| 数据 | 优先级 |
+|------|--------|
+| 单股行情 (fetch_one) | 新浪单股K线 → 东财全量 |
+| 批量行情 (fetch_quotes) | 新浪全量 → 东财全量 |
+| 财务数据 (fetch) | 同花顺 → 新浪 |
+| 基本信息 (find) | 东财 → 新浪 |
+
+> 注：东财API有频率限制容易被限频，新浪作为首选；财务数据默认取最新N期（`iloc[::-1]`逆序后取head）。
 
 ### 统一对外接口
 
-每个Repository接口由多个Adapter实现，外部只看到接口：
-- `StockRepository` — 股票信息查询
-- `FinancialRepository` — 财务数据查询
-- `QuoteRepository` — 行情数据查询
+每个Repository接口由多个Adapter实现，外部只看到接口。方法名已消歧：
+- `StockRepository` — `find(code)`, `search(keyword)`
+- `QuoteRepository` — `fetch_one(code)`, `fetch_quotes(codes)`
+- `FinancialRepository` — `fetch(code, periods)`, `fetch_financials(codes, periods)`
 
 Router按 `DataSourceId.priority` 串联adapter，透明降级。
 
@@ -125,9 +151,10 @@ Router按 `DataSourceId.priority` 串联adapter，透明降级。
 
 | 聚合 | 说明 |
 |------|------|
-| **Dimension** | DimensionId("financial"/"industry"/"valuation")、DimensionWeights、CustomDimension（用户描述+LLM prompt模板） |
+| **Dimension** | DimensionId("financial"/"industry"/"valuation")、权重、CustomDimension |
 | **ScreenTask** | dimensions, universe(all/watchlist), status, results |
-| **ScreenResult** | stock, dimension_scores, composite_score, tier, reasoning |
+| **ScreenResult** | stock, score_card(dimension_scores, composite_score, tier, reasoning) |
+| **ScreeningOutcome** | results + errors + skipped（筛选结果含错误和跳过的股票） |
 
 ### 评分模型
 
@@ -137,18 +164,24 @@ Router按 `DataSourceId.priority` 串联adapter，透明降级。
 | 60-80 | 推荐 | 有一定成长价值 |
 | 80-100 | 力荐 | 成长价值突出 |
 
-**ScreenResult 结构：**
-- `dimension_scores` — 各维度独立打分
-- `composite_score` — 综合评分（加权/等权/LLM综合判断）
-- `tier` — 评分档位
-- `reasoning` — LLM生成的推荐理由
+**ScreeningOutcome 结构：**
+- `results: list[ScreenResult]` — 成功评分的股票（按综合评分降序）
+- `errors: list[str]` — 代码解析失败的错误信息
+- `skipped: list[str]` — 无行情数据或LLM评分失败的股票及原因
 
-### 筛选策略
+### 智能发现（DiscoveryService）
 
-| 策略 | 说明 |
-|------|------|
-| **PreScreenStrategy** | 定时全市场初筛，快速过滤 |
-| **DeepScreenStrategy** | 按需深度分析，LLM精细化打分 |
+面向投资新手，不知道具体股票代码时，通过自然语言描述需求来发现股票。
+
+```
+用户输入 "推荐3只消费股"
+  → LLM解析：消费 → 食品,白酒,家电,零售,服装（扩展为多个可匹配关键词）
+  → 候选发现：THS概念名匹配 → EM行业成分股 → Sina全量名称匹配（至少2字符模糊）
+  → LLM评分：所有候选股票逐一打分
+  → 返回：综合评分最高的前N只
+```
+
+- `POST /api/screening/discover` — `{query, count}` → `ScreeningResponse`
 
 ### 默认评估维度
 
@@ -342,13 +375,27 @@ stock-selector/
 
 ```
 ScreeningAppService.Execute()
-  ├──1→ Market: batch_fetch(universe) → List[Quote]
-  │       └── DataSourceRouter → TushareAdapter → AKShareAdapter(降级)
-  ├──2→ Market: batch_fetch_financials(universe) → List[FinancialReport]
+  ├──1→ Market: fetch_quotes(codes) → List[Quote]
+  │       └── DataSourceRouter → Sina → East Money(降级)
+  ├──2→ Market: fetch_financials(codes) → dict[StockCode, List[FinancialReport]]
+  │       └── DataSourceRouter → 同花顺 → 新浪(降级)
   ├──3→ LLM: batch_score(quotes + financials + dimensions) → List[ScoreCard]
-  │       └── ScenarioRouter → OpenAICompatAdapter(deepseek)
-  ├──4→ Screening: ScreenTaskRepository.save(task)
-  └──5→ 返回 List[ScreenResult]
+  │       └── OpenAICompatAdapter(deepseek)
+  └──4→ 返回 ScreeningOutcome(results, errors, skipped)
+```
+
+### 智能发现（同步）
+
+```
+DiscoveryService.discover(query="推荐3只消费股", count=3)
+  ├──1→ LLM: _parse_query() → ["食品","白酒","家电","零售","服装"]
+  │       └── LLM将宽泛描述扩展为具体关键词
+  ├──2→ _find_candidates(keywords, limit) → List[StockCode]
+  │       ├── THS概念名匹配 → EM成分股（限频时失败）
+  │       └── Sina全量名称匹配（至少2字符模糊）→ 按关键词找到候选
+  ├──3→ ScreenStockUseCase.screen_batch(candidates)
+  │       └── 所有候选 → 行情+财务+LLM评分
+  └──4→ 返回 ScreeningOutcome（按综合评分降序，取前count只）
 ```
 
 ### 定时扫描推送（异步）
@@ -356,7 +403,7 @@ ScreeningAppService.Execute()
 ```
 APScheduler 触发 cron
   → ExecuteMonitorUseCase.execute(monitor_task)
-      → 复用 ScreeningAppService（同上1-4步）
+      → 复用 ScreenStockUseCase
       → 发布 ScreeningCompleted 事件
   → Notification 订阅 ScreeningCompleted
       → GenerateReportUseCase → LLM生成报告
@@ -405,9 +452,10 @@ APScheduler 触发 cron
 │   └── GET  /stocks/{code}/financials # 财务数据
 │
 ├── /screening
-│   ├── POST /tasks                     # 创建筛选任务
+│   ├── POST /tasks                     # 创建筛选任务（指定代码）
 │   ├── GET  /tasks/{id}               # 任务状态
 │   ├── GET  /tasks/{id}/results       # 筛选结果（含ScoreCard）
+│   ├── POST /discover                 # 智能发现：自然语言 → 推荐股票
 │   └── POST /pre-screen               # 手动初筛
 │
 ├── /llm
@@ -447,7 +495,9 @@ APScheduler 触发 cron
 
 ## 16. 配置设计
 
-### 默认配置（default.yaml — 随代码发布）
+### 默认配置（default.yaml — 直接编辑）
+
+LLM Provider和数据源账号直接配置在 `default.yaml` 中（单用户工具，无需分层）。
 
 ```yaml
 market:
@@ -467,13 +517,17 @@ market:
       type: account
       priority: 1
       enabled: false
+  accounts:                          # 账号数据源token
+    tushare:
+      token: "your_tushare_token"
 
 llm:
-  providers: []
-  scenario_routing:
-    conversation: ${provider}
-    scoring: ${provider}
-    report: ${provider}
+  providers:                         # LLM配置（通过WebUI Settings页面配置后自动写入）
+    - id: deepseek
+      api_base: https://api.deepseek.com/v1
+      api_key: sk-xxx
+      model: deepseek-chat
+      default: true
 
 screening:
   default_dimensions: ["financial", "industry", "valuation"]
@@ -489,31 +543,10 @@ scheduler:
   default_cron: "0 18 * * 1-5"
 ```
 
-### 用户配置（user.yaml / 数据库存储）
-
-```yaml
-market:
-  accounts:
-    tushare:
-      token: "your_tushare_token"
-
-llm:
-  providers:
-    - id: deepseek
-      api_base: https://api.deepseek.com/v1
-      api_key: sk-xxx
-      model: deepseek-chat
-      default: true
-
-notification:
-  channels:
-    - id: wecom_1
-      type: wecom
-      webhook_url: https://qyapi.weixin.qq.com/...
-      enabled: true
-```
-
-**配置优先级：** 数据库 > 用户YAML > default.yaml
+**配置方式：**
+- 直接编辑 `config/default.yaml`
+- 或通过 WebUI Settings 页面配置（自动写入 default.yaml）
+- 系统启动时从 default.yaml 加载
 
 ---
 
@@ -549,17 +582,23 @@ notification:
 
 ---
 
-## 19. 前端页面规划（初版）
+## 19. 前端页面规划
 
 | 页面 | 功能 |
 |------|------|
-| 首页/Dashboard | 概览：今日推荐、市场总览、最近筛选 |
-| 选股中心 | 发起筛选、查看结果、维度配置 |
-| AI对话 | 自然语言选股对话 |
-| 我的关注 | 关注列表管理 |
-| 监控管理 | 监控任务CRUD、推送渠道配置 |
+| 首页/Dashboard | 概览：数据源状态、关注数量、快捷操作 |
+| 选股中心 | **双模式**：智能发现（自然语言→推荐）+ 代码筛选（指定代码评分） |
+| AI对话 | SSE流式对话，自然语言选股咨询 |
+| 我的关注 | 关注列表管理（添加/删除） |
+| 监控管理 | 监控任务CRUD + 推送渠道（企微/飞书/钉钉）配置 |
 | 筛选历史 | 历史筛选任务和结果回顾 |
-| 设置 | LLM配置、数据源账号、偏好设置 |
+| 设置 | LLM Provider配置 + 数据源账号管理 + Prompt模板查看 |
+
+**选股中心 — 智能发现模式：**
+- 用户输入自然语言描述（如"推荐3只消费股"）
+- LLM自动扩展为多个可匹配关键词（消费→食品,白酒,家电,零售,服装）
+- 全市场候选股票筛选 → LLM逐一评分 → 返回Top N
+- 结果表格：股票信息、综合评分、档位标签、各维度评分条、推荐理由
 
 ---
 

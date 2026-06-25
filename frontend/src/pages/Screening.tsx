@@ -4,6 +4,17 @@ import { SearchOutlined, BulbOutlined } from '@ant-design/icons';
 import { screeningApi } from '../api/screening';
 import type { ScreenResultResponse } from '../types';
 
+function getTodayKey() { return new Date().toISOString().slice(0, 10); }
+function incTodayCount(n: number) {
+  try {
+    const data = JSON.parse(localStorage.getItem('screening_counts') || '{}');
+    const key = getTodayKey();
+    data[key] = (data[key] || 0) + n;
+    localStorage.setItem('screening_counts', JSON.stringify(data));
+    window.dispatchEvent(new Event('screening-count-updated'));
+  } catch {}
+}
+
 const dimensionOptions = [
   { label: '财务成长性', value: 'financial' },
   { label: '行业赛道', value: 'industry' },
@@ -35,6 +46,7 @@ const Screening: React.FC = () => {
     try {
       const resp = await screeningApi.create(codeList, dimensions);
       setResults(resp.results);
+      incTodayCount(resp.count);
       message.success(`筛选完成，共 ${resp.count} 只股票`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '未知错误';
@@ -60,6 +72,7 @@ const Screening: React.FC = () => {
         return r.json();
       });
       setResults(resp.results || []);
+      incTodayCount(resp.count || 0);
       message.success(`发现 ${resp.count} 只推荐股票`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '未知错误';

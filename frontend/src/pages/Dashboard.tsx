@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Row, Col, Card, Statistic, Typography, Button, Space } from 'antd';
+import { Row, Col, Card, Statistic, Typography, Button, Space, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { SearchOutlined, StarOutlined, MessageOutlined } from '@ant-design/icons';
 import { configApi } from '../api/config';
@@ -7,18 +7,37 @@ import { userApi } from '../api/user';
 import type { DataSourceItem } from '../types';
 
 const marketStatusColors: Record<string, string> = {
-  '交易中': '#52c41a',
-  '盘前': '#faad14',
-  '午间休市': '#faad14',
-  '已闭市': '#8c8c8c',
-  '休市': '#8c8c8c',
+  '交易中': 'green',
+  '盘前': 'gold',
+  '午间休市': 'orange',
+  '已闭市': 'default',
+  '休市': 'default',
 };
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+function readTodayCount(): number {
+  try {
+    const data = JSON.parse(localStorage.getItem('screening_counts') || '{}');
+    return data[getTodayKey()] || 0;
+  } catch { return 0; }
+}
+function incrementTodayCount(n: number) {
+  try {
+    const data = JSON.parse(localStorage.getItem('screening_counts') || '{}');
+    const key = getTodayKey();
+    data[key] = (data[key] || 0) + n;
+    localStorage.setItem('screening_counts', JSON.stringify(data));
+  } catch {}
+}
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [sources, setSources] = useState<DataSourceItem[]>([]);
   const [watchCount, setWatchCount] = useState(0);
   const [marketStatus, setMarketStatus] = useState('加载中');
+  const [todayCount, setTodayCount] = useState(readTodayCount());
 
   useEffect(() => {
     configApi.getDataSources().then(d => setSources(d.sources)).catch(() => {});
@@ -27,6 +46,11 @@ const Dashboard: React.FC = () => {
       .then(r => r.json())
       .then(d => setMarketStatus(d.status))
       .catch(() => setMarketStatus('未知'));
+    setTodayCount(readTodayCount());
+
+    const onCountUpdate = () => setTodayCount(readTodayCount());
+    window.addEventListener('screening-count-updated', onCountUpdate);
+    return () => window.removeEventListener('screening-count-updated', onCountUpdate);
   }, []);
 
   const enabledSources = sources.filter(s => s.enabled);
@@ -42,10 +66,15 @@ const Dashboard: React.FC = () => {
           <Card><Statistic title="关注股票" value={watchCount} /></Card>
         </Col>
         <Col span={6}>
-          <Card><Statistic title="市场状态" value={marketStatus} valueStyle={{ color: marketStatusColors[marketStatus] || '#8c8c8c' }} /></Card>
+          <Card>
+            <div style={{ color: 'rgba(0,0,0,0.45)', fontSize: 14, marginBottom: 8 }}>市场状态</div>
+            <Tag color={marketStatusColors[marketStatus] || 'default'} style={{ fontSize: 18, padding: '4px 12px' }}>
+              {marketStatus}
+            </Tag>
+          </Card>
         </Col>
         <Col span={6}>
-          <Card><Statistic title="今日筛选" value="0" /></Card>
+          <Card><Statistic title="今日筛选" value={todayCount} suffix="只" /></Card>
         </Col>
       </Row>
 

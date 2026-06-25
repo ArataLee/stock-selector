@@ -17,19 +17,22 @@ async def market_status():
     if today.weekday() >= 5:
         return {"status": "休市", "detail": "周末休市"}
 
-    # Check trading calendar via AKShare
+    # Check trading calendar for known holidays (only if calendar data is reliable)
     try:
         import akshare as ak
         df = ak.tool_trade_date_hist_sina()
         trade_dates = set(str(d) for d in df["trade_date"].values)
         today_str = today.strftime("%Y%m%d")
-        if today_str not in trade_dates:
+        # Only trust calendar if it covers recent dates (within last 7 days)
+        from datetime import timedelta
+        recent_dates = {(today - timedelta(days=i)).strftime("%Y%m%d") for i in range(7)}
+        has_recent = bool(recent_dates & trade_dates)
+        if has_recent and today_str not in trade_dates:
             return {"status": "休市", "detail": "节假日休市"}
     except Exception:
-        pass  # fallback to time-based check below
+        pass
 
     # Time-of-day check
-    now_h = date.today()  # placeholder — actual time check done server-side
     from datetime import datetime
     now = datetime.now()
     t = now.hour * 60 + now.minute
